@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>채팅 분석기 정적 테스트 페이지</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #f3f4f6;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #111827;
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        display: grid;
+        gap: 14px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 18px;
+      }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .muted { color: #6b7280; font-size: 13px; }
+      textarea {
+        width: 100%;
+        min-height: 230px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 12px;
+        resize: vertical;
+        font-size: 13px;
+      }
+      input[type='password'] {
+        width: 100%;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+      button {
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .primary {
+        background: #111827;
+        color: #fff;
+        border-color: #111827;
+      }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip {
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .error {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      @media (max-width: 760px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1 style="margin:0 0 6px 0; font-size:20px;">💬 채팅 분석기 정적 테스트 페이지</h1>
+        <p class="muted" style="margin:0;">
+          React/의존성 설치 없이 브라우저에서 바로 UI/파싱 흐름을 테스트할 수 있는 임시 페이지입니다.
+        </p>
+      </section>
+
+      <section class="card">
+        <div style="font-size:13px; font-weight:600; margin-bottom:8px;">API Key 입력(테스트용)</div>
+        <input id="apiKey" type="password" placeholder="sk-ant-..." />
+        <div class="muted" style="margin-top:6px;">
+          이 정적 페이지는 실제 API를 호출하지 않고, 로컬 파싱 기반 미리보기만 제공합니다.
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="between" style="margin-bottom:8px;">
+          <strong style="font-size:14px;">채팅 로그 입력</strong>
+          <div class="row">
+            <button id="uploadBtn" type="button">📎 .txt 업로드</button>
+            <input id="fileInput" type="file" accept=".txt" hidden />
+            <span id="textLen" class="muted">0자</span>
+          </div>
+        </div>
+        <textarea id="chatInput" placeholder="카카오톡 채팅 내용을 붙여넣으세요.
+예: 2026년 02월 25일 수요일
+2026. 2. 25. 오후 1:00, 홍길동 : 안녕하세요"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <button id="sampleBtn" type="button">샘플 로그 채우기</button>
+          <button id="analyzeBtn" type="button" class="primary">정적 분석 실행</button>
+        </div>
+        <div id="errorBox" style="margin-top:10px;"></div>
+      </section>
+
+      <section id="resultSection" class="card" style="display:none;">
+        <div class="between" style="margin-bottom:10px;">
+          <strong>분석 결과(정적 미리보기)</strong>
+          <button id="resetBtn" type="button">초기화</button>
+        </div>
+
+        <div class="grid" style="margin-bottom:10px;">
+          <div class="card" style="padding:14px;">
+            <div class="muted" style="margin-bottom:6px;">기본 통계</div>
+            <div id="overview" style="font-size:13px; line-height:1.7;"></div>
+          </div>
+          <div class="card" style="padding:14px;">
+            <div class="muted" style="margin-bottom:6px;">핵심 인사이트</div>
+            <div id="insight" style="font-size:13px; line-height:1.7;"></div>
+          </div>
+        </div>
+
+        <div class="muted" style="margin-bottom:6px;">멤버 목록</div>
+        <div id="memberChips" class="chips"></div>
+      </section>
+    </main>
+
+    <script>
+      const chatInput = document.getElementById('chatInput');
+      const textLen = document.getElementById('textLen');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const fileInput = document.getElementById('fileInput');
+      const sampleBtn = document.getElementById('sampleBtn');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const resultSection = document.getElementById('resultSection');
+      const overviewEl = document.getElementById('overview');
+      const insightEl = document.getElementById('insight');
+      const memberChips = document.getElementById('memberChips');
+      const errorBox = document.getElementById('errorBox');
+
+      const sampleLog = `2026년 02월 25일 수요일
+2026. 2. 25. 오후 1:00, 지수 : 오늘 점심 뭐 드셨어요?
+2026. 2. 25. 오후 1:01, 민수 : 저는 김치찌개요
+2026. 2. 25. 오후 1:02, 지수 : 오 맛있겠다
+2026. 2. 25. 오후 1:05, 하늘 : 저는 샐러드요
+2026. 2. 26. 오후 9:10, 민수 : 오늘도 고생했어요
+2026. 2. 26. 오후 9:12, 지수 : 다들 푹 쉬세요`;
+
+      function setError(msg = '') {
+        errorBox.innerHTML = msg ? `<div class="error">${msg}</div>` : '';
+      }
+
+      function parseMembers(rawText) {
+        const leftMembers = new Set();
+        const leavePatterns = [
+          /^.+, (.+?) : (.+?)님이 나갔습니다/gm,
+          /(.+?)님이 나갔습니다/gm,
+          /(.+?)님이 퇴장하셨습니다/gm,
+        ];
+        for (const pattern of leavePatterns) {
+          let match;
+          while ((match = pattern.exec(rawText)) !== null) {
+            const name = (match[2] || match[1] || '').trim();
+            if (name) leftMembers.add(name);
+          }
+        }
+
+        const count = {};
+        const patterns = [/^.+, (.+?) : .+$/gm, /^\[(.+?)\] \[(오전|오후)?\s?\d{1,2}:\d{2}/gm];
+        for (const pattern of patterns) {
+          let match;
+          while ((match = pattern.exec(rawText)) !== null) {
+            const name = (match[1] || '').trim();
+            if (!name || name === '카카오톡' || name.startsWith('20')) continue;
+            count[name] = (count[name] || 0) + 1;
+          }
+          if (Object.keys(count).length > 0) break;
+        }
+
+        return Object.entries(count)
+          .filter(([name]) => !leftMembers.has(name))
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, messages]) => ({ name, messages }));
+      }
+
+      function analyzeLocal(rawText) {
+        const members = parseMembers(rawText);
+        const totalMessages = members.reduce((sum, m) => sum + m.messages, 0);
+        const dateMatches = rawText.match(/^(\d{4}[.\-년]\s?\d{1,2}[.\-월]\s?\d{1,2})/gm) || [];
+        const activeDays = new Set(dateMatches).size;
+        const avg = activeDays > 0 ? Math.round(totalMessages / activeDays) : 0;
+
+        return {
+          members,
+          overview: {
+            totalMessages,
+            totalMembers: members.length,
+            activeDays,
+            avgMessagesPerDay: avg,
+          },
+          keyInsight:
+            members.length > 0
+              ? `${members[0].name}님이 가장 활발하고, 총 ${members.length}명이 대화에 참여했어요.`
+              : '대화 패턴을 찾기 어려워요. 로그 형식을 확인해주세요.',
+        };
+      }
+
+      function renderResult(result) {
+        overviewEl.innerHTML = `
+          • 총 메시지: <strong>${result.overview.totalMessages.toLocaleString()}개</strong><br>
+          • 참여 멤버: <strong>${result.overview.totalMembers}명</strong><br>
+          • 활동 일수: <strong>${result.overview.activeDays}일</strong><br>
+          • 일평균 메시지: <strong>${result.overview.avgMessagesPerDay}개</strong>
+        `;
+
+        insightEl.textContent = result.keyInsight;
+
+        memberChips.innerHTML = '';
+        result.members.forEach((m) => {
+          const el = document.createElement('span');
+          el.className = 'chip';
+          el.textContent = `${m.name} (${m.messages})`;
+          memberChips.appendChild(el);
+        });
+
+        resultSection.style.display = 'block';
+      }
+
+      chatInput.addEventListener('input', () => {
+        textLen.textContent = `${chatInput.value.length.toLocaleString()}자`;
+      });
+
+      uploadBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          chatInput.value = ev.target?.result || '';
+          textLen.textContent = `${chatInput.value.length.toLocaleString()}자`;
+        };
+        reader.onerror = () => setError('파일을 읽지 못했습니다.');
+        reader.readAsText(file, 'utf-8');
+      });
+
+      sampleBtn.addEventListener('click', () => {
+        chatInput.value = sampleLog;
+        textLen.textContent = `${chatInput.value.length.toLocaleString()}자`;
+      });
+
+      analyzeBtn.addEventListener('click', () => {
+        const raw = chatInput.value.trim();
+        if (!raw) {
+          setError('채팅 로그를 입력해주세요.');
+          return;
+        }
+        setError('');
+        const result = analyzeLocal(raw);
+        renderResult(result);
+      });
+
+      resetBtn.addEventListener('click', () => {
+        resultSection.style.display = 'none';
+        memberChips.innerHTML = '';
+        insightEl.textContent = '';
+      });
+    </script>
+  </body>
+</html>
